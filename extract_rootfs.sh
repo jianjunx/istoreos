@@ -148,26 +148,36 @@ extract_rootfs() {
     # 解压镜像文件
     log_info "解压镜像文件..."
     
-    # 首先验证 gzip 文件
-    if ! gzip -t "$img_gz_file" 2>/dev/null; then
-        log_warning "gzip 文件验证失败，但仍尝试解压..."
+    # 检查 gzip 文件头
+    local file_header=$(head -c 2 "$img_gz_file" | xxd -p)
+    if [ "$file_header" != "1f8b" ]; then
+        error_exit "文件不是有效的 gzip 格式"
     fi
     
-    # 解压文件，忽略可能的警告
-    if gunzip -c "$img_gz_file" > "$img_file" 2>/dev/null; then
-        log_success "解压完成"
-    else
-        log_warning "gunzip 报告了警告，但解压可能仍然成功"
-        # 检查输出文件
-        if [ -f "$img_file" ] && [ "$(stat -c%s "$img_file" 2>/dev/null || stat -f%z "$img_file")" -gt 100000000 ]; then
-            log_success "输出文件存在且大小合理，继续处理..."
+    log_info "文件具有有效的 gzip 头部，开始解压..."
+    log_info "注意: 'trailing garbage ignored' 警告是正常的，可以安全忽略"
+    
+    # 解压文件，允许尾随垃圾数据的警告
+    gunzip -c "$img_gz_file" > "$img_file" 2>&1 | tee extraction.log || true
+    
+    # 检查解压结果
+    if [ -f "$img_file" ]; then
+        local img_size=$(stat -c%s "$img_file" 2>/dev/null || stat -f%z "$img_file")
+        log_info "解压后文件大小: $(( img_size / 1024 / 1024 )) MB"
+        
+        # 验证文件大小是否合理 (应该大于200MB)
+        if [ "$img_size" -gt 209715200 ]; then
+            log_success "解压成功 - 文件大小合理"
         else
-            error_exit "解压失败或输出文件太小"
+            log_error "警告: 解压后文件过小: $img_size bytes"
+            cat extraction.log
+            error_exit "解压文件大小异常"
         fi
+    else
+        log_error "解压失败 - 未创建输出文件"
+        cat extraction.log
+        error_exit "解压失败"
     fi
-    
-    local img_size=$(stat -c%s "$img_file" 2>/dev/null || stat -f%z "$img_file")
-    log_info "镜像文件大小: $(( img_size / 1024 / 1024 )) MB"
     
     # 加载 NBD 模块
     log_info "加载 NBD 模块..."

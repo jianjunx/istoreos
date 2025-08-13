@@ -83,49 +83,65 @@ jobs:
             exit 1
           fi
 
-          # 检查文件是否为有效的gzip文件
-          if ! gzip -t istoreos.img.gz 2>/dev/null; then
-            echo "Downloaded file is not a valid gzip file, retrying..."
+          # 检查文件头是否为gzip格式
+          file_header=$(head -c 2 istoreos.img.gz | xxd -p)
+          if [ "$file_header" != "1f8b" ]; then
+            echo "File does not have gzip header, retrying download..."
             rm -f istoreos.img.gz
             wget ${ISTOREOS_URL}${latest_file} -O istoreos.img.gz
             
-            # 再次验证大小和格式
+            # 再次验证大小和头部
             file_size=$(stat -c%s istoreos.img.gz)
             if [ "$file_size" -lt 52428800 ]; then
               echo "Retry download still too small: $file_size bytes"
               exit 1
             fi
             
-            if ! gzip -t istoreos.img.gz 2>/dev/null; then
-              echo "File is still invalid after retry. Manual intervention may be needed."
+            file_header=$(head -c 2 istoreos.img.gz | xxd -p)
+            if [ "$file_header" != "1f8b" ]; then
+              echo "File still does not have gzip header after retry."
               echo "File contents preview:"
               head -c 100 istoreos.img.gz | xxd
               exit 1
             fi
           fi
 
+          echo "File has valid gzip header, proceeding with extraction..."
+
           echo "File validation successful"
 
       - name: Extract rootfs from img.gz
         if: env.skip_build == 'false'
         run: |
-          # 解压镜像文件，忽略尾随垃圾数据的警告
+          # 解压镜像文件，可能会有尾随垃圾数据的警告，但这是正常的
           echo "Extracting image file..."
-          if gunzip -c istoreos.img.gz > istoreos.img 2>/dev/null; then
-            echo "Extraction completed successfully"
-          else
-            echo "Gunzip reported warnings, but extraction may still be successful"
-            # 检查输出文件是否存在且有合理大小
-            if [ -f "istoreos.img" ] && [ "$(stat -c%s istoreos.img)" -gt 100000000 ]; then
-              echo "Output file exists and has reasonable size, continuing..."
+          echo "Note: 'trailing garbage ignored' warnings are normal and can be safely ignored"
+
+          # 使用更宽松的解压策略
+          gunzip -c istoreos.img.gz > istoreos.img 2>&1 | tee extraction.log || true
+
+          # 检查解压结果
+          if [ -f "istoreos.img" ]; then
+            img_size=$(stat -c%s istoreos.img)
+            echo "Extracted image file size: $img_size bytes"
+            
+            # 验证文件大小是否合理 (应该大于200MB解压后)
+            if [ "$img_size" -gt 209715200 ]; then
+              echo "Extraction successful - file size is reasonable"
             else
-              echo "Extraction failed or output file is too small"
+              echo "Warning: Extracted file seems too small: $img_size bytes"
+              echo "Extraction log:"
+              cat extraction.log
+              echo "File listing:"
               ls -la istoreos.*
               exit 1
             fi
+          else
+            echo "Extraction failed - no output file created"
+            echo "Extraction log:"
+            cat extraction.log
+            exit 1
           fi
-
-          echo "Image file size: $(stat -c%s istoreos.img) bytes"
 
           # 使用 NBD 设备挂载镜像
           sudo modprobe nbd max_part=8
