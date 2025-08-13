@@ -141,7 +141,7 @@ GitHub Actions 工作流使用以下权限：
 
 | 权限类型          | 说明                             |
 | ----------------- | -------------------------------- |
-| `contents: read`  | 读取仓库内容                     |
+| `contents: write` | 读取仓库内容和创建 Releases      |
 | `packages: write` | 推送到 GitHub Container Registry |
 
 **注意**: 使用 `${{ secrets.GITHUB_TOKEN }}` 进行身份验证，无需额外配置 Secrets。

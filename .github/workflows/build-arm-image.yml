@@ -21,7 +21,7 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - name: Checkout
@@ -258,12 +258,10 @@ jobs:
 
       - name: Create Release
         if: env.skip_build == 'false'
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.full_version }}
-          release_name: iStoreOS ARM Release ${{ env.full_version }}
+          name: iStoreOS ARM Release ${{ env.full_version }}
           body: |
             ## iStoreOS ARM 自动构建
 
@@ -298,8 +296,6 @@ jobs:
             - **文件**: ${{ env.latest_file }}
 
             本版本由 GitHub Actions 自动构建，基于原生 iStoreOS 根文件系统构建。
-          draft: false
-          prerelease: false
 
       - name: Clean up artifacts
         if: always()
