@@ -12,7 +12,7 @@ on:
     - cron: '0 10 * * *' # 每天10点检测一次
 
 env:
-  DOCKERHUB_REPO: ${{ secrets.DOCKER_HUB_USERNAME }}/istoreos-arm
+  DOCKERHUB_REPO: jjxie233/istoreos-arm
   DOCKER_TAG: latest
   ISTOREOS_URL: https://fw.koolcenter.com/iStoreOS/armsr/
 
@@ -28,7 +28,7 @@ jobs:
           sudo apt update
           sudo apt install -y wget curl qemu-utils kpartx \
             e2fsprogs tar gzip zstd bzip2 util-linux parted \
-            losetup coreutils
+            coreutils
 
       - name: Check latest version
         id: checkver

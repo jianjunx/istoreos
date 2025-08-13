@@ -80,7 +80,7 @@ check_dependencies() {
     if [ ${#missing_deps[@]} -ne 0 ]; then
         log_error "缺少以下依赖: ${missing_deps[*]}"
         log_info "请运行以下命令安装依赖:"
-        log_info "sudo apt install -y wget curl qemu-utils tar gzip util-linux"
+        log_info "sudo apt install -y wget curl qemu-utils kpartx e2fsprogs tar gzip zstd bzip2 util-linux parted coreutils"
         exit 1
     fi
     
