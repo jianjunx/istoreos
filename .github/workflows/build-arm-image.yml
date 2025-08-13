@@ -1,0 +1,227 @@
+name: Auto Sync iStoreOS ARM to Docker Hub
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: '强制构建镜像'
+        required: false
+        default: 'false'
+        type: boolean
+  schedule:
+    - cron: '0 10 * * *' # 每天10点检测一次
+
+env:
+  DOCKERHUB_REPO: ${{ secrets.DOCKER_HUB_USERNAME }}/istoreos-arm
+  DOCKER_TAG: latest
+  ISTOREOS_URL: https://fw.koolcenter.com/iStoreOS/armsr/
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y wget curl qemu-utils kpartx \
+            e2fsprogs tar gzip zstd bzip2 util-linux parted \
+            losetup coreutils
+
+      - name: Check latest version
+        id: checkver
+        run: |
+          latest_file=$(curl -s $ISTOREOS_URL | grep -oE 'istoreos-[^ ]+efi.img.gz' | head -n1)
+          echo "latest_file=$latest_file" >> $GITHUB_ENV
+
+          # 提取版本信息
+          full_version=$(echo $latest_file | sed -n 's/istoreos-\([0-9.]*\)-\([0-9]*\)-armsr-squashfs-combined-efi\.img\.gz/\1-\2/p')
+          software_version=$(echo $latest_file | sed -n 's/istoreos-\([0-9.]*\)-\([0-9]*\)-armsr-squashfs-combined-efi\.img\.gz/\1/p')
+          version_tag=$(echo $latest_file | sed -n 's/istoreos-\([0-9.]*\)-\([0-9]*\)-armsr-squashfs-combined-efi\.img\.gz/\2/p')
+
+          echo "full_version=$full_version" >> $GITHUB_ENV
+          echo "software_version=$software_version" >> $GITHUB_ENV
+          echo "version_tag=$version_tag" >> $GITHUB_ENV
+
+          echo "Latest file: $latest_file"
+          echo "Full version: $full_version"
+          echo "Software version: $software_version"
+          echo "Version tag: $version_tag"
+
+          # 检查是否已存在该版本的标签，除非强制构建
+          if [ "${{ github.event.inputs.force_build }}" != "true" ]; then
+            if git tag | grep -q "$full_version"; then
+              echo "Version $full_version already exists, exiting."
+              echo "skip_build=true" >> $GITHUB_ENV
+            else
+              echo "skip_build=false" >> $GITHUB_ENV
+            fi
+          else
+            echo "Force build enabled, proceeding..."
+            echo "skip_build=false" >> $GITHUB_ENV
+          fi
+
+      - name: Download latest img.gz
+        if: env.skip_build == 'false'
+        run: |
+          echo "Downloading: ${ISTOREOS_URL}${latest_file}"
+          wget ${ISTOREOS_URL}${latest_file} -O istoreos.img.gz
+
+      - name: Extract rootfs from img.gz
+        if: env.skip_build == 'false'
+        run: |
+          # 解压镜像文件
+          gunzip -c istoreos.img.gz > istoreos.img
+
+          # 使用 NBD 设备挂载镜像
+          sudo modprobe nbd max_part=8
+          sudo qemu-nbd --connect=/dev/nbd0 istoreos.img
+          sleep 3
+          sudo partprobe /dev/nbd0
+
+          # 列出分区信息
+          sudo fdisk -l /dev/nbd0
+
+          # 创建挂载点并尝试挂载各个分区
+          mkdir -p rootfs
+
+          # 尝试挂载第二个分区（通常是根文件系统）
+          if sudo mount -o ro /dev/nbd0p2 rootfs 2>/dev/null; then
+            echo "Successfully mounted /dev/nbd0p2"
+          elif sudo mount -o ro /dev/nbd0p1 rootfs 2>/dev/null; then
+            echo "Successfully mounted /dev/nbd0p1"
+          else
+            echo "Failed to mount any partition, trying all available partitions..."
+            for part in /dev/nbd0p*; do
+              if [ -e "$part" ]; then
+                echo "Trying to mount $part"
+                if sudo mount -o ro "$part" rootfs 2>/dev/null; then
+                  echo "Successfully mounted $part"
+                  break
+                fi
+              fi
+            done
+          fi
+
+          # 检查是否成功挂载了根文件系统
+          if [ -d "rootfs/etc" ] && [ -d "rootfs/usr" ]; then
+            echo "Root filesystem detected"
+            ls -la rootfs/ | head -10
+            
+            # 创建 rootfs.tar
+            sudo tar -cf rootfs.tar -C rootfs .
+            sudo chown $USER:$USER rootfs.tar
+            
+            echo "rootfs.tar created successfully"
+            ls -lh rootfs.tar
+          else
+            echo "Failed to find valid root filesystem"
+            ls -la rootfs/
+            exit 1
+          fi
+
+          # 清理
+          sudo umount rootfs
+          sudo qemu-nbd --disconnect /dev/nbd0
+
+      - name: Upload Artifact
+        if: env.skip_build == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: istoreos-arm-rootfs-${{ env.version_tag }}
+          path: rootfs.tar
+          retention-days: 1
+
+      - name: Set up QEMU
+        if: env.skip_build == 'false'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: env.skip_build == 'false'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: env.skip_build == 'false'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Build Docker image
+        if: env.skip_build == 'false'
+        run: |
+          mkdir -p docker-build
+          cp rootfs.tar docker-build/
+          cd docker-build
+
+          cat > Dockerfile <<'EOF'
+          FROM scratch
+          ADD rootfs.tar /
+          CMD ["/sbin/init"]
+          EOF
+
+          echo "Building Docker images with tags:"
+          echo "- $DOCKERHUB_REPO:$DOCKER_TAG"
+          echo "- $DOCKERHUB_REPO:${{ env.full_version }}"
+          echo "- $DOCKERHUB_REPO:${{ env.software_version }}"
+          echo "- $DOCKERHUB_REPO:${{ env.version_tag }}"
+
+          docker buildx build --platform linux/arm64 \
+            -t $DOCKERHUB_REPO:$DOCKER_TAG \
+            -t $DOCKERHUB_REPO:${{ env.full_version }} \
+            -t $DOCKERHUB_REPO:${{ env.software_version }} \
+            -t $DOCKERHUB_REPO:${{ env.version_tag }} \
+            --push .
+
+      - name: Create Release
+        if: env.skip_build == 'false'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.full_version }}
+          release_name: iStoreOS ARM Release ${{ env.full_version }}
+          body: |
+            ## iStoreOS ARM 自动构建
+
+            ### 版本信息
+            - **完整版本**: ${{ env.full_version }}
+            - **软件版本**: ${{ env.software_version }}
+            - **时间戳**: ${{ env.version_tag }}
+            - **镜像名称**: ${{ env.latest_file }}
+            - **构建时间**: ${{ github.run_number }}
+
+            ### Docker 镜像
+
+            可用标签:
+            - `${{ env.DOCKERHUB_REPO }}:latest`
+            - `${{ env.DOCKERHUB_REPO }}:${{ env.full_version }}`
+            - `${{ env.DOCKERHUB_REPO }}:${{ env.software_version }}`
+            - `${{ env.DOCKERHUB_REPO }}:${{ env.version_tag }}`
+
+            ### 使用方法
+
+            ```bash
+            # 拉取最新镜像
+            docker pull ${{ env.DOCKERHUB_REPO }}:latest
+
+            # 运行容器
+            docker run -it --privileged ${{ env.DOCKERHUB_REPO }}:latest
+            ```
+
+            ### 原始镜像下载
+
+            - **来源**: [iStoreOS 官方下载](https://fw.koolcenter.com/iStoreOS/armsr/)
+            - **文件**: ${{ env.latest_file }}
+
+            本版本由 GitHub Actions 自动构建，基于原生 iStoreOS 根文件系统构建。
+          draft: false
+          prerelease: false
+
+      - name: Clean up artifacts
+        if: always()
+        run: |
+          rm -f istoreos.img.gz istoreos.img rootfs.tar
+          sudo rm -rf rootfs docker-build
