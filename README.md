@@ -139,12 +139,11 @@ istoreos-arm/
 
 在 GitHub 仓库设置中添加以下 Secrets：
 
-| Secret 名称               | 描述                               |
-| ------------------------- | ---------------------------------- |
-| `DOCKER_HUB_USERNAME`     | Docker Hub 用户名 (可选，已硬编码) |
-| `DOCKER_HUB_ACCESS_TOKEN` | Docker Hub 访问令牌 (必需)         |
+| Secret 名称               | 描述                       |
+| ------------------------- | -------------------------- |
+| `DOCKER_HUB_ACCESS_TOKEN` | Docker Hub 访问令牌 (必需) |
 
-**注意**: Docker Hub 用户名已在工作流中设置为 `jjxie233`，您只需要配置访问令牌即可。
+**注意**: Docker Hub 用户名已在工作流中硬编码为 `jjxie233`，您只需要配置访问令牌即可。
 
 ### 工作流触发条件
 

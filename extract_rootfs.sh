@@ -147,7 +147,27 @@ extract_rootfs() {
     
     # 解压镜像文件
     log_info "解压镜像文件..."
-    gunzip -c "$img_gz_file" > "$img_file"
+    
+    # 首先验证 gzip 文件
+    if ! gzip -t "$img_gz_file" 2>/dev/null; then
+        log_warning "gzip 文件验证失败，但仍尝试解压..."
+    fi
+    
+    # 解压文件，忽略可能的警告
+    if gunzip -c "$img_gz_file" > "$img_file" 2>/dev/null; then
+        log_success "解压完成"
+    else
+        log_warning "gunzip 报告了警告，但解压可能仍然成功"
+        # 检查输出文件
+        if [ -f "$img_file" ] && [ "$(stat -c%s "$img_file" 2>/dev/null || stat -f%z "$img_file")" -gt 100000000 ]; then
+            log_success "输出文件存在且大小合理，继续处理..."
+        else
+            error_exit "解压失败或输出文件太小"
+        fi
+    fi
+    
+    local img_size=$(stat -c%s "$img_file" 2>/dev/null || stat -f%z "$img_file")
+    log_info "镜像文件大小: $(( img_size / 1024 / 1024 )) MB"
     
     # 加载 NBD 模块
     log_info "加载 NBD 模块..."
@@ -212,7 +232,7 @@ extract_rootfs() {
     # 创建 rootfs.tar
     log_info "创建 rootfs.tar..."
     sudo tar -cf "$WORK_DIR/$ROOTFS_TAR" -C "$WORK_DIR/rootfs" .
-    sudo chown "$USER:$(id -gn)" "$WORK_DIR/$ROOTFS_TAR"
+    sudo chown "$(id -u):$(id -g)" "$WORK_DIR/$ROOTFS_TAR"
     
     # 移动到当前目录
     mv "$WORK_DIR/$ROOTFS_TAR" "./$ROOTFS_TAR"

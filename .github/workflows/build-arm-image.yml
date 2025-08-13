@@ -52,7 +52,11 @@ jobs:
 
           # 检查是否已存在该版本的标签，除非强制构建
           if [ "${{ github.event.inputs.force_build }}" != "true" ]; then
-            if git tag | grep -q "$full_version"; then
+            # 获取所有远程标签
+            git fetch --tags
+            
+            # 使用精确匹配检查标签是否存在
+            if git tag --list | grep -Fx "$full_version"; then
               echo "Version $full_version already exists, exiting."
               echo "skip_build=true" >> $GITHUB_ENV
             else
@@ -69,11 +73,59 @@ jobs:
           echo "Downloading: ${ISTOREOS_URL}${latest_file}"
           wget ${ISTOREOS_URL}${latest_file} -O istoreos.img.gz
 
+          # 验证下载的文件
+          echo "Downloaded file size: $(stat -c%s istoreos.img.gz) bytes"
+
+          # 验证文件大小是否合理 (应该大于50MB)
+          file_size=$(stat -c%s istoreos.img.gz)
+          if [ "$file_size" -lt 52428800 ]; then
+            echo "Downloaded file size is too small: $file_size bytes"
+            exit 1
+          fi
+
+          # 检查文件是否为有效的gzip文件
+          if ! gzip -t istoreos.img.gz 2>/dev/null; then
+            echo "Downloaded file is not a valid gzip file, retrying..."
+            rm -f istoreos.img.gz
+            wget ${ISTOREOS_URL}${latest_file} -O istoreos.img.gz
+            
+            # 再次验证大小和格式
+            file_size=$(stat -c%s istoreos.img.gz)
+            if [ "$file_size" -lt 52428800 ]; then
+              echo "Retry download still too small: $file_size bytes"
+              exit 1
+            fi
+            
+            if ! gzip -t istoreos.img.gz 2>/dev/null; then
+              echo "File is still invalid after retry. Manual intervention may be needed."
+              echo "File contents preview:"
+              head -c 100 istoreos.img.gz | xxd
+              exit 1
+            fi
+          fi
+
+          echo "File validation successful"
+
       - name: Extract rootfs from img.gz
         if: env.skip_build == 'false'
         run: |
-          # 解压镜像文件
-          gunzip -c istoreos.img.gz > istoreos.img
+          # 解压镜像文件，忽略尾随垃圾数据的警告
+          echo "Extracting image file..."
+          if gunzip -c istoreos.img.gz > istoreos.img 2>/dev/null; then
+            echo "Extraction completed successfully"
+          else
+            echo "Gunzip reported warnings, but extraction may still be successful"
+            # 检查输出文件是否存在且有合理大小
+            if [ -f "istoreos.img" ] && [ "$(stat -c%s istoreos.img)" -gt 100000000 ]; then
+              echo "Output file exists and has reasonable size, continuing..."
+            else
+              echo "Extraction failed or output file is too small"
+              ls -la istoreos.*
+              exit 1
+            fi
+          fi
+
+          echo "Image file size: $(stat -c%s istoreos.img) bytes"
 
           # 使用 NBD 设备挂载镜像
           sudo modprobe nbd max_part=8
@@ -112,7 +164,7 @@ jobs:
             
             # 创建 rootfs.tar
             sudo tar -cf rootfs.tar -C rootfs .
-            sudo chown $USER:$USER rootfs.tar
+            sudo chown $(id -u):$(id -g) rootfs.tar
             
             echo "rootfs.tar created successfully"
             ls -lh rootfs.tar
@@ -146,7 +198,7 @@ jobs:
         if: env.skip_build == 'false'
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          username: jjxie233
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
       - name: Build Docker image
@@ -223,5 +275,12 @@ jobs:
       - name: Clean up artifacts
         if: always()
         run: |
+          # 确保卸载所有挂载点
+          sudo umount rootfs 2>/dev/null || true
+
+          # 确保断开NBD设备
+          sudo qemu-nbd --disconnect /dev/nbd0 2>/dev/null || true
+
+          # 清理文件
           rm -f istoreos.img.gz istoreos.img rootfs.tar
           sudo rm -rf rootfs docker-build
