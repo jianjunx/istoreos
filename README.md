@@ -12,12 +12,12 @@
 - ✅ **自动构建**: 检测到新版本时自动构建原生 Docker 镜像
 - ✅ **ARM64 优化**: 专门针对 ARM64 架构构建
 - ✅ **版本管理**: 自动打标签和发布到 GitHub Releases
-- ✅ **Docker Hub**: 自动推送到 Docker Hub
+- ✅ **GHCR**: 自动推送到 GitHub Container Registry
 
 ## 🔄 最新版本
 
 - **最新镜像版本**: 从 [iStoreOS ARM 官方下载](https://fw.koolcenter.com/iStoreOS/armsr/) 自动获取
-- **Docker Hub**: [jjxie233/istoreos-arm](https://hub.docker.com/r/jjxie233/istoreos-arm)
+- **Container Registry**: [ghcr.io/jianjunx/istoreos](https://github.com/jianjunx/istoreos/pkgs/container/istoreos)
 - **更新频率**: 每 6 小时检查一次（全天候自动同步）
 
 ## 🐳 Docker 镜像使用
@@ -26,21 +26,21 @@
 
 ```bash
 # 拉取最新镜像
-docker pull jjxie233/istoreos-arm:latest
+docker pull ghcr.io/jianjunx/istoreos:latest
 
 # 拉取指定完整版本
-docker pull jjxie233/istoreos-arm:24.10.2-2025080813
+docker pull ghcr.io/jianjunx/istoreos:24.10.2-2025080813
 
 # 拉取指定软件版本
-docker pull jjxie233/istoreos-arm:24.10.2
+docker pull ghcr.io/jianjunx/istoreos:24.10.2
 
 # 运行原生 iStoreOS 容器（需要特权模式运行系统服务）
-docker run -it --privileged jjxie233/istoreos-arm:latest
+docker run -it --privileged ghcr.io/jianjunx/istoreos:latest
 
 # 后台运行 iStoreOS 系统
 docker run -d --privileged \
   --name istoreos-system \
-  jjxie233/istoreos-arm:latest
+  ghcr.io/jianjunx/istoreos:latest
 
 # 进入运行中的容器
 docker exec -it istoreos-system /bin/bash
@@ -135,15 +135,16 @@ istoreos-arm/
 
 ## ⚙️ GitHub Actions 配置
 
-### 必需的 Secrets
+### 必需的权限
 
-在 GitHub 仓库设置中添加以下 Secrets：
+GitHub Actions 工作流使用以下权限：
 
-| Secret 名称               | 描述                       |
-| ------------------------- | -------------------------- |
-| `DOCKER_HUB_ACCESS_TOKEN` | Docker Hub 访问令牌 (必需) |
+| 权限类型          | 说明                             |
+| ----------------- | -------------------------------- |
+| `contents: read`  | 读取仓库内容                     |
+| `packages: write` | 推送到 GitHub Container Registry |
 
-**注意**: Docker Hub 用户名已在工作流中硬编码为 `jjxie233`，您只需要配置访问令牌即可。
+**注意**: 使用 `${{ secrets.GITHUB_TOKEN }}` 进行身份验证，无需额外配置 Secrets。
 
 ### 工作流触发条件
 

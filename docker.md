@@ -10,17 +10,17 @@
 
 ```bash
 # 拉取最新版本
-docker pull jjxie233/istoreos-arm:latest
+docker pull ghcr.io/jianjunx/istoreos:latest
 
 # 或拉取特定版本
-docker pull jjxie233/istoreos-arm:2025080813
+docker pull ghcr.io/jianjunx/istoreos:2025080813
 ```
 
 ### 2. 基本运行
 
 ```bash
 # 最简单的运行方式
-docker run -it --privileged jjxie233/istoreos-arm:latest
+docker run -it --privileged ghcr.io/jianjunx/istoreos:latest
 ```
 
 ## 🔧 高级配置
@@ -30,7 +30,7 @@ docker run -it --privileged jjxie233/istoreos-arm:latest
 #### 特权模式（必需）
 
 ```bash
-docker run -it --privileged jjxie233/istoreos-arm:latest
+docker run -it --privileged ghcr.io/jianjunx/istoreos:latest
 ```
 
 **为什么需要特权模式？**
@@ -47,7 +47,7 @@ docker run -it --privileged jjxie233/istoreos-arm:latest
 docker run -it --privileged \
   -v $(pwd)/rootfs:/opt/istoreos/rootfs \
   -v $(pwd)/images:/opt/istoreos/image \
-  jjxie233/istoreos-arm:latest
+  ghcr.io/jianjunx/istoreos:latest
 ```
 
 #### 环境变量配置
@@ -56,21 +56,21 @@ docker run -it --privileged \
 docker run -it --privileged \
   -e KEEP_RUNNING=true \
   -e TZ=Asia/Shanghai \
-  jjxie233/istoreos-arm:latest
+  ghcr.io/jianjunx/istoreos:latest
 ```
 
 ### 网络配置
 
 ```bash
 # 使用主机网络模式
-docker run -it --privileged --network host jjxie233/istoreos-arm:latest
+docker run -it --privileged --network host ghcr.io/jianjunx/istoreos:latest
 
 # 端口映射（如果需要）
 docker run -it --privileged \
   -p 80:80 \
   -p 443:443 \
   -p 22:22 \
-  jjxie233/istoreos-arm:latest
+  ghcr.io/jianjunx/istoreos:latest
 ```
 
 ## 🛠️ 使用场景
@@ -81,7 +81,7 @@ docker run -it --privileged \
 # 分析 iStoreOS 镜像内容
 docker run --privileged \
   -v $(pwd)/analysis:/opt/istoreos/rootfs \
-  jjxie233/istoreos-arm:latest
+  ghcr.io/jianjunx/istoreos:latest
 
 # 查看分析报告
 cat analysis_report.txt
@@ -95,7 +95,7 @@ docker run -it --privileged \
   --name istoreos-dev \
   -v $(pwd)/workspace:/workspace \
   -e KEEP_RUNNING=true \
-  jjxie233/istoreos-arm:latest
+  ghcr.io/jianjunx/istoreos:latest
 
 # 重新连接到开发环境
 docker exec -it istoreos-dev /bin/bash
@@ -109,7 +109,7 @@ docker exec -it istoreos-dev /bin/bash
   run: |
     docker run --privileged \
       -v ${{ github.workspace }}:/workspace \
-      jjxie233/istoreos-arm:latest \
+      ghcr.io/jianjunx/istoreos:latest \
       /workspace/test-script.sh
 ```
 
@@ -119,7 +119,7 @@ docker exec -it istoreos-dev /bin/bash
 # 运行自动化测试脚本
 docker run --privileged \
   -v $(pwd)/tests:/tests \
-  jjxie233/istoreos-arm:latest \
+  ghcr.io/jianjunx/istoreos:latest \
   /tests/run-tests.sh
 ```
 
@@ -167,7 +167,7 @@ docker inspect istoreos-container
 
 ```bash
 # 确保使用 --privileged 标志
-docker run -it --privileged jjxie233/istoreos-arm:latest
+docker run -it --privileged ghcr.io/jianjunx/istoreos:latest
 ```
 
 #### 2. Loop 设备错误
@@ -198,7 +198,7 @@ wget -O image/istoreos.img.gz "https://fw.koolcenter.com/iStoreOS/armsr/最新�
 # 使用本地镜像运行
 docker run -it --privileged \
   -v $(pwd)/image:/opt/istoreos/image \
-  jjxie233/istoreos-arm:latest
+  ghcr.io/jianjunx/istoreos:latest
 ```
 
 #### 4. 磁盘空间不足
@@ -232,7 +232,7 @@ docker logs 容器名
 # 以调试模式运行
 docker run -it --privileged \
   --entrypoint /bin/bash \
-  jjxie233/istoreos-arm:latest
+  ghcr.io/jianjunx/istoreos:latest
 
 # 手动执行处理脚本
 /opt/istoreos/process_image.sh
@@ -246,7 +246,7 @@ docker run -it --privileged \
 # 以 bash 作为入口点启动
 docker run -it --privileged \
   --entrypoint /bin/bash \
-  jjxie233/istoreos-arm:latest
+  ghcr.io/jianjunx/istoreos:latest
 
 # 在容器内手动执行步骤
 cd /opt/istoreos
@@ -260,7 +260,7 @@ ls -la
 # 设置环境变量保持运行
 docker run -it --privileged \
   -e KEEP_RUNNING=true \
-  jjxie233/istoreos-arm:latest
+  ghcr.io/jianjunx/istoreos:latest
 ```
 
 #### 3. 挂载调试工具
@@ -269,7 +269,7 @@ docker run -it --privileged \
 # 挂载包含调试工具的目录
 docker run -it --privileged \
   -v $(pwd)/debug-tools:/debug \
-  jjxie233/istoreos-arm:latest
+  ghcr.io/jianjunx/istoreos:latest
 ```
 
 ## 📈 性能优化
@@ -279,7 +279,7 @@ docker run -it --privileged \
 ```bash
 # 使用 BuildKit 缓存
 export DOCKER_BUILDKIT=1
-docker build --cache-from jjxie233/istoreos-arm:latest .
+docker build --cache-from ghcr.io/jianjunx/istoreos:latest .
 ```
 
 ### 2. 多阶段构建
@@ -300,7 +300,7 @@ FROM ubuntu:22.04 as runtime
 docker run -it --privileged \
   --memory=2g \
   --cpus=2 \
-  jjxie233/istoreos-arm:latest
+  ghcr.io/jianjunx/istoreos:latest
 ```
 
 ## 🔄 版本管理
@@ -318,7 +318,7 @@ docker run -it --privileged \
 
 ```bash
 # 拉取最新版本
-docker pull jjxie233/istoreos-arm:latest
+docker pull ghcr.io/jianjunx/istoreos:latest
 
 # 停止旧容器
 docker stop old-container
@@ -327,7 +327,7 @@ docker rm old-container
 # 启动新容器
 docker run -it --privileged \
   --name new-container \
-  jjxie233/istoreos-arm:latest
+  ghcr.io/jianjunx/istoreos:latest
 ```
 
 ## 🛡️ 安全考虑
@@ -341,7 +341,7 @@ docker run -it --privileged \
 ```bash
 # 使用自定义网络
 docker network create istoreos-net
-docker run -it --privileged --network istoreos-net jjxie233/istoreos-arm:latest
+docker run -it --privileged --network istoreos-net ghcr.io/jianjunx/istoreos:latest
 ```
 
 ### 3. 用户权限
@@ -364,7 +364,7 @@ docker exec -it --user nobody 容器名 /bin/bash
 - [Docker 官方文档](https://docs.docker.com/)
 - [iStoreOS 官方网站](https://www.istoreos.com/)
 - [项目 GitHub 仓库](https://github.com/jianjunx/istoreos-arm)
-- [Docker Hub 页面](https://hub.docker.com/r/jjxie233/istoreos-arm)
+- [GitHub Container Registry](https://github.com/jianjunx/istoreos/pkgs/container/istoreos)
 
 ---
 

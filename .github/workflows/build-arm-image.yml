@@ -12,13 +12,17 @@ on:
     - cron: '0 10 * * *' # 每天10点检测一次
 
 env:
-  DOCKERHUB_REPO: jjxie233/istoreos-arm
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
   DOCKER_TAG: latest
   ISTOREOS_URL: https://fw.koolcenter.com/iStoreOS/armsr/
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -218,12 +222,13 @@ jobs:
         if: env.skip_build == 'false'
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
+      - name: Log in to Container Registry
         if: env.skip_build == 'false'
         uses: docker/login-action@v3
         with:
-          username: jjxie233
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Docker image
         if: env.skip_build == 'false'
@@ -239,16 +244,16 @@ jobs:
           EOF
 
           echo "Building Docker images with tags:"
-          echo "- $DOCKERHUB_REPO:$DOCKER_TAG"
-          echo "- $DOCKERHUB_REPO:${{ env.full_version }}"
-          echo "- $DOCKERHUB_REPO:${{ env.software_version }}"
-          echo "- $DOCKERHUB_REPO:${{ env.version_tag }}"
+          echo "- ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DOCKER_TAG }}"
+          echo "- ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.full_version }}"
+          echo "- ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.software_version }}"
+          echo "- ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.version_tag }}"
 
           docker buildx build --platform linux/arm64 \
-            -t $DOCKERHUB_REPO:$DOCKER_TAG \
-            -t $DOCKERHUB_REPO:${{ env.full_version }} \
-            -t $DOCKERHUB_REPO:${{ env.software_version }} \
-            -t $DOCKERHUB_REPO:${{ env.version_tag }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DOCKER_TAG }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.full_version }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.software_version }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.version_tag }} \
             --push .
 
       - name: Create Release
@@ -272,19 +277,19 @@ jobs:
             ### Docker 镜像
 
             可用标签:
-            - `${{ env.DOCKERHUB_REPO }}:latest`
-            - `${{ env.DOCKERHUB_REPO }}:${{ env.full_version }}`
-            - `${{ env.DOCKERHUB_REPO }}:${{ env.software_version }}`
-            - `${{ env.DOCKERHUB_REPO }}:${{ env.version_tag }}`
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest`
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.full_version }}`
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.software_version }}`
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.version_tag }}`
 
             ### 使用方法
 
             ```bash
             # 拉取最新镜像
-            docker pull ${{ env.DOCKERHUB_REPO }}:latest
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
             # 运行容器
-            docker run -it --privileged ${{ env.DOCKERHUB_REPO }}:latest
+            docker run -it --privileged ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ```
 
             ### 原始镜像下载

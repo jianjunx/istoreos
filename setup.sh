@@ -209,7 +209,7 @@ main() {
     echo
     log_info "项目信息:"
     log_info "GitHub: https://github.com/jianjunx/istoreos-arm"
-    log_info "Docker Hub: https://hub.docker.com/r/jjxie233/istoreos-arm"
+    log_info "Container Registry: https://github.com/jianjunx/istoreos/pkgs/container/istoreos"
 }
 
 # 运行主函数
