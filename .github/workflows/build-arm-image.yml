@@ -145,7 +145,15 @@ jobs:
 
           # 使用 NBD 设备挂载镜像
           sudo modprobe nbd max_part=8
-          sudo qemu-nbd --connect=/dev/nbd0 istoreos.img
+
+          echo "Connecting NBD device..."
+          if sudo qemu-nbd --connect=/dev/nbd0 --format=raw istoreos.img; then
+            echo "NBD device connected successfully"
+          else
+            echo "Failed to connect NBD device"
+            exit 1
+          fi
+
           sleep 3
           sudo partprobe /dev/nbd0
 

@@ -185,7 +185,11 @@ extract_rootfs() {
     
     # 连接 NBD 设备
     log_info "连接 NBD 设备..."
-    sudo qemu-nbd --connect=/dev/nbd0 "$img_file"
+    if sudo qemu-nbd --connect=/dev/nbd0 --format=raw "$img_file"; then
+        log_success "NBD 设备连接成功"
+    else
+        error_exit "NBD 设备连接失败"
+    fi
     sleep 3
     
     # 探测分区
